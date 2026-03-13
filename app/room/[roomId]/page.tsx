@@ -20,6 +20,14 @@ export default function RoomPage() {
   
   // Ref to prevent double-checking the same problem
   const lastCheckedIndex = useRef(-1);
+  const previousProblemIndex = useRef(0);
+
+  // Request Notification Permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Poll room state
   useEffect(() => {
@@ -47,6 +55,38 @@ export default function RoomPage() {
     const interval = setInterval(fetchRoom, 2000); // poll every 2 seconds
     return () => clearInterval(interval);
   }, [roomId]);
+
+  // Alert when problem changes (someone solved it)
+  useEffect(() => {
+    if (!room || room.status !== "running") return;
+    
+    if (room.currentProblemIndex > previousProblemIndex.current) {
+      // The problem index advanced!
+      const justSolvedProblem = room.problems[previousProblemIndex.current];
+      const nameOfProblem = `${justSolvedProblem.contestId}${justSolvedProblem.index}`;
+      
+      // Determine who solved it by looking at who had the last score increase
+      // (This is a simplified assumption that the opponent solved it if we are on a different tab, 
+      // but if we solved it ourselves we probably still want the nice sound/alert)
+      
+      // Play a success sound
+      try {
+        const audio = new Audio("https://cdn.freesound.org/previews/270/270402_5123851-lq.mp3");
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log("Audio play blocked by browser:", e));
+      } catch (e) {}
+
+      // Trigger Browser Notification
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Next Problem Unlocked!", {
+          body: `Problem ${nameOfProblem} was solved! Time to race on the next one!`,
+          icon: "/favicon.ico", // Replace with your actual icon if you have one
+        });
+      }
+
+      previousProblemIndex.current = room.currentProblemIndex;
+    }
+  }, [room?.currentProblemIndex, room?.status, room?.problems]);
 
   // Check solve logic
   useEffect(() => {
