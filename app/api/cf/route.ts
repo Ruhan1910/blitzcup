@@ -7,11 +7,19 @@ export async function GET(request: Request) {
     return Response.json({ error: "handle is required" }, { status: 400 });
   }
 
-  const res = await fetch(
-    `https://codeforces.com/api/user.status?handle=${handle}&from=1&count=${count}`
-  );
+  try {
+    const res = await fetch(
+      `https://codeforces.com/api/user.status?handle=${handle}&from=1&count=${count}`
+    );
 
-  const data = await res.json();
+    if (!res.ok) {
+        return Response.json({ error: `Codeforces API returned ${res.status}` }, { status: 500 });
+    }
 
-  return Response.json(data);
+    const data = await res.json();
+
+    return Response.json(data);
+  } catch (error: any) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
 }

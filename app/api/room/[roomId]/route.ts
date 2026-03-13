@@ -1,0 +1,58 @@
+import { NextResponse } from "next/server";
+import { roomsStore, Room } from "@/lib/store";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
+  const { roomId } = await params;
+  const normalizedId = roomId.toUpperCase();
+  const room = roomsStore.get(normalizedId);
+
+  if (!room) {
+    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  }
+
+  // Check if time is up
+  if (room.status === "running" && room.startTime) {
+    const elapsedSeconds = (Date.now() - room.startTime) / 1000;
+    if (elapsedSeconds >= room.durationMinutes * 60) {
+      room.status = "finished";
+      room.winner = getWinner(room);
+    }
+  }
+
+  return NextResponse.json({ room });
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
+  const { roomId } = await params;
+  const normalizedId = roomId.toUpperCase();
+  const room = roomsStore.get(normalizedId);
+
+  if (!room) {
+    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  }
+
+  try {
+    const updates: Partial<Room> = await request.json();
+    
+    // Merge updates
+    Object.assign(room, updates);
+
+    return NextResponse.json({ room });
+  } catch (err) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+}
+
+function getWinner(room: Room) {
+  const s1 = room.player1?.score || 0;
+  const s2 = room.player2?.score || 0;
+  if (s1 > s2) return room.player1?.handle || "Player 1";
+  if (s2 > s1) return room.player2?.handle || "Player 2";
+  return "Draw";
+}
