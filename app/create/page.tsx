@@ -7,9 +7,7 @@ export default function CreateContest() {
   const router = useRouter();
 
   const [problems, setProblems] = useState<{ id: string; points: number | string }[]>([
-    { id: "4A", points: 10 },
-    { id: "71A", points: 20 },
-    { id: "158A", points: 30 },
+    { id: "", points: "" },
   ]);
   const [duration, setDuration] = useState<number | string>(20);
   const [loading, setLoading] = useState(false);
@@ -19,15 +17,51 @@ export default function CreateContest() {
     try {
       // Parse problems
       const parsedProblems = problems.map((p) => {
-        const match = p.id.trim().match(/^(\d+)([A-Za-z]\d*)$/);
-        if (!match) throw new Error(`Invalid problem format: ${p.id}. Use format like '2207G'.`);
+        let contestIdStr = "";
+        let indexStr = "";
+
+        const trimmed = p.id.trim();
+
+        // Try parsing full Codeforces URL
+        try {
+          if (trimmed.startsWith("http")) {
+            const url = new URL(trimmed);
+            const pathParts = url.pathname.split("/").filter(Boolean);
+            
+            // Format 1: /problemset/problem/1955/A
+            if (pathParts[0] === "problemset" && pathParts[1] === "problem" && pathParts.length >= 4) {
+              contestIdStr = pathParts[2];
+              indexStr = pathParts[3];
+            } 
+            // Format 2: /contest/1955/problem/A
+            else if (pathParts[0] === "contest" && pathParts[2] === "problem" && pathParts.length >= 4) {
+              contestIdStr = pathParts[1];
+              indexStr = pathParts[3];
+            }
+          }
+        } catch (e) {
+          // Ignore URL parsing errors, maybe it's a short ID
+        }
+
+        // Fallback to short ID parsing
+        if (!contestIdStr || !indexStr) {
+          const match = trimmed.match(/^(\d+)([A-Za-z]\d*)$/);
+          if (match) {
+            contestIdStr = match[1];
+            indexStr = match[2];
+          }
+        }
+
+        if (!contestIdStr || !indexStr) {
+           throw new Error(`Invalid problem format or link: ${p.id}. Use a Codeforces link or format like '2207G'.`);
+        }
         
         const pts = typeof p.points === "string" ? parseInt(p.points) : p.points;
         if (!pts || pts < 1 || pts > 100) throw new Error(`Points must be between 1 and 100.`);
 
         return {
-          contestId: parseInt(match[1]),
-          index: match[2].toUpperCase(),
+          contestId: parseInt(contestIdStr),
+          index: indexStr.toUpperCase(),
           points: pts,
         };
       });
@@ -61,7 +95,7 @@ export default function CreateContest() {
   }
 
   function addProblem() {
-    setProblems([...problems, { id: "", points: 10 }]);
+    setProblems([...problems, { id: "", points: "" }]);
   }
 
   function removeProblem(index: number) {
@@ -103,15 +137,21 @@ export default function CreateContest() {
             </div>
 
             <div className="space-y-3">
+              <div className="flex gap-3 items-center px-1 mb-1">
+                <div className="w-8"></div>
+                <div className="flex-1 text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Problem Link or ID</div>
+                <div className="w-32 text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Points</div>
+                <div className="w-10"></div>
+              </div>
               {problems.map((p, i) => (
                 <div key={i} className="flex gap-3 items-center group">
                   <div className="w-8 text-center text-neutral-500 font-mono text-sm">{i + 1}</div>
                   <input
                     type="text"
-                    placeholder="e.g. 2207G"
+                    placeholder="CF problem link or ID (e.g. 2207G)"
                     value={p.id}
                     onChange={(e) => updateProblem(i, "id", e.target.value)}
-                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono uppercase"
+                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono min-w-0"
                   />
                   <input
                     type="number"
