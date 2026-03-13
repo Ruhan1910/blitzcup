@@ -12,7 +12,7 @@ export default function Home() {
           v1.0 is live ⚡️
         </div>
         <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-600 drop-shadow-sm leading-tight">
-          BlitzCup
+          BlitzChallenge
         </h1>
         <p className="text-xl md:text-2xl text-neutral-400 mb-12 font-medium leading-relaxed max-w-2xl mx-auto">
           The ultimate real-time programming duel platform. Challenge your friends to solve Codeforces problems head-to-head.
