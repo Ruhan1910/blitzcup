@@ -66,13 +66,13 @@ export default function RoomPage() {
       if (room.status !== "running" || room.problems[room.currentProblemIndex] !== currentProblem) return;
       
       try {
-        const res = await fetch(`/api/cf?handle=${myHandle}&count=100`);
+        // Cache buster
+        const timestamp = new Date().getTime();
+        const res = await fetch(`/api/cf?handle=${myHandle}&count=10&_t=${timestamp}`, { cache: "no-store" });
         const data = await res.json();
         
         if (data.status === "OK") {
           // Compare strings to avoid 123 === "123" failing
-          // ALSO check that the solve happened AFTER the duel started
-          // so old solves don't instantly win the duel!
           const solved = data.result.find((s: any) => {
             if (s.verdict !== "OK") return false;
             
@@ -81,10 +81,10 @@ export default function RoomPage() {
             
             if (!isTargetProblem) return false;
 
-            // Ensure the submission happened after the room started running
+            // Ensure the submission happened after the room started running.
+            // Give a 5 minute grace period backwards in case of slight clock sync issues between CF and our server
             if (room.startTime) {
-               // CF time is in seconds, room startTime is in ms
-               const roomStartSeconds = Math.floor(room.startTime / 1000);
+               const roomStartSeconds = Math.floor(room.startTime / 1000) - 300;
                return s.creationTimeSeconds >= roomStartSeconds;
             }
             return false;
