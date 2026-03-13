@@ -24,8 +24,14 @@ export default function RoomPage() {
 
   // Request Notification Permission on mount
   useEffect(() => {
-    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-      Notification.requestPermission();
+    try {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+          Notification.requestPermission().catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.log("Notifications not supported or blocked");
     }
   }, []);
 
@@ -77,11 +83,15 @@ export default function RoomPage() {
       } catch (e) {}
 
       // Trigger Browser Notification
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Next Problem Unlocked!", {
-          body: `Problem ${nameOfProblem} was solved! Time to race on the next one!`,
-          icon: "/favicon.ico", // Replace with your actual icon if you have one
-        });
+      try {
+        if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+          new Notification("Next Problem Unlocked!", {
+            body: `Problem ${nameOfProblem} was solved! Time to race on the next one!`,
+            icon: "/favicon.ico", 
+          });
+        }
+      } catch (e) {
+        console.log("Notification trigger failed", e);
       }
 
       previousProblemIndex.current = room.currentProblemIndex;
