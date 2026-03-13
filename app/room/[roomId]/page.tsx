@@ -59,8 +59,34 @@ export default function RoomPage() {
     }
 
     fetchRoom();
-    const interval = setInterval(fetchRoom, 2000); // poll every 2 seconds
-    return () => clearInterval(interval);
+
+    let worker: Worker | null = null;
+    let intervalId: any = 0;
+    try {
+      const blob = new Blob([`
+        let timer = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            timer = setInterval(() => self.postMessage('tick'), 2000);
+          } else if (e.data === 'stop') {
+            clearInterval(timer);
+          }
+        };
+      `], { type: 'application/javascript' });
+      worker = new Worker(URL.createObjectURL(blob));
+      worker.onmessage = () => fetchRoom();
+      worker.postMessage('start');
+    } catch (e) {
+      intervalId = setInterval(fetchRoom, 2000);
+    }
+    
+    return () => {
+      if (worker) {
+        worker.postMessage('stop');
+        worker.terminate();
+      }
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [roomId]);
 
   // Alert when problem changes (someone solved it)
@@ -78,7 +104,7 @@ export default function RoomPage() {
       
       // Play a success sound
       try {
-        const audio = new Audio("https://cdn.freesound.org/previews/320/320655_527080-lq.mp3");
+        const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1114/1114-preview.mp3");
         audio.volume = 0.5;
         audio.play().catch(e => console.log("Audio play blocked by browser:", e));
       } catch (e) {}
@@ -116,7 +142,7 @@ export default function RoomPage() {
     const myHandle = mySlot === "player1" ? room.player1?.handle : room.player2?.handle;
     if (!myHandle) return;
 
-    const interval = setInterval(async () => {
+    const checkFetch = async () => {
       // Prevent overlapping checks if state just updated
       if (room.status !== "running" || room.problems[room.currentProblemIndex] !== currentProblem) return;
       if (room.nextProblemUnlockedAt && Date.now() < room.nextProblemUnlockedAt) return;
@@ -187,9 +213,36 @@ export default function RoomPage() {
       } catch (err) {
         console.error("API error", err);
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(interval);
+    let worker: Worker | null = null;
+    let intervalId: any = 0;
+    
+    try {
+      const blob = new Blob([`
+        let timer = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            timer = setInterval(() => self.postMessage('tick'), 2000);
+          } else if (e.data === 'stop') {
+            clearInterval(timer);
+          }
+        };
+      `], { type: 'application/javascript' });
+      worker = new Worker(URL.createObjectURL(blob));
+      worker.onmessage = checkFetch;
+      worker.postMessage('start');
+    } catch (e) {
+      intervalId = setInterval(checkFetch, 2000);
+    }
+
+    return () => {
+      if (worker) {
+        worker.postMessage('stop');
+        worker.terminate();
+      }
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [room?.status, room?.currentProblemIndex, mySlot, room?.problems, roomId]);
 
 
