@@ -43,6 +43,11 @@ export async function POST(
     
     // Merge updates
     const updatedRoom = { ...room, ...updates };
+
+    if (updatedRoom.status === "finished" && !updatedRoom.winner) {
+      updatedRoom.winner = getWinner(updatedRoom);
+    }
+
     await setRoom(normalizedId, updatedRoom);
 
     return NextResponse.json({ room: updatedRoom });

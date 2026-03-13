@@ -4,6 +4,7 @@ export type Problem = {
   contestId: number;
   index: string;
   points: number;
+  solvedBy?: "player1" | "player2" | null;
 };
 
 export type Player = {
@@ -21,6 +22,7 @@ export type Room = {
   currentProblemIndex: number;
   status: "waiting" | "running" | "finished";
   winner: string | null;
+  nextProblemUnlockedAt?: number | null;
 };
 
 // Local fallback for development without Redis

@@ -11,60 +11,86 @@ export default function CreateContest() {
   ]);
   const [duration, setDuration] = useState<number | string>(20);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"manual" | "random">("manual");
+  const [minRating, setMinRating] = useState<number | string>(1000);
+  const [maxRating, setMaxRating] = useState<number | string>(1200);
+  const [problemCount, setProblemCount] = useState<number | string>(5);
 
   async function handleCreate() {
     setLoading(true);
     try {
-      // Parse problems
-      const parsedProblems = problems.map((p) => {
-        let contestIdStr = "";
-        let indexStr = "";
+      let finalProblems: { contestId: number; index: string; points: number }[] = [];
 
-        const trimmed = p.id.trim();
+      if (mode === "random") {
+        const countNum = typeof problemCount === "string" ? parseInt(problemCount) : problemCount;
+        const minNum = typeof minRating === "string" ? parseInt(minRating) : minRating;
+        const maxNum = typeof maxRating === "string" ? parseInt(maxRating) : maxRating;
+        
+        if (!countNum || countNum < 1 || countNum > 20) throw new Error("Count must be between 1 and 20.");
+        if (!minNum || !maxNum || minNum > maxNum) throw new Error("Invalid rating range.");
 
-        // Try parsing full Codeforces URL
-        try {
-          if (trimmed.startsWith("http")) {
-            const url = new URL(trimmed);
-            const pathParts = url.pathname.split("/").filter(Boolean);
-            
-            // Format 1: /problemset/problem/1955/A
-            if (pathParts[0] === "problemset" && pathParts[1] === "problem" && pathParts.length >= 4) {
-              contestIdStr = pathParts[2];
-              indexStr = pathParts[3];
-            } 
-            // Format 2: /contest/1955/problem/A
-            else if (pathParts[0] === "contest" && pathParts[2] === "problem" && pathParts.length >= 4) {
-              contestIdStr = pathParts[1];
-              indexStr = pathParts[3];
+        const res = await fetch(`/api/problems/random?min=${minNum}&max=${maxNum}&count=${countNum}`);
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || "Failed to fetch random problems");
+
+        finalProblems = data.problems.map((p: any) => ({
+          contestId: p.contestId,
+          index: p.index,
+          points: 100, // Assign 100 points for each random problem uniformly
+        }));
+      } else {
+        // Parse problems
+        finalProblems = problems.map((p) => {
+          let contestIdStr = "";
+          let indexStr = "";
+
+          const trimmed = p.id.trim();
+
+          // Try parsing full Codeforces URL
+          try {
+            if (trimmed.startsWith("http")) {
+              const url = new URL(trimmed);
+              const pathParts = url.pathname.split("/").filter(Boolean);
+              
+              // Format 1: /problemset/problem/1955/A
+              if (pathParts[0] === "problemset" && pathParts[1] === "problem" && pathParts.length >= 4) {
+                contestIdStr = pathParts[2];
+                indexStr = pathParts[3];
+              } 
+              // Format 2: /contest/1955/problem/A
+              else if (pathParts[0] === "contest" && pathParts[2] === "problem" && pathParts.length >= 4) {
+                contestIdStr = pathParts[1];
+                indexStr = pathParts[3];
+              }
+            }
+          } catch (e) {
+            // Ignore URL parsing errors, maybe it's a short ID
+          }
+
+          // Fallback to short ID parsing
+          if (!contestIdStr || !indexStr) {
+            const match = trimmed.match(/^(\d+)([A-Za-z]\d*)$/);
+            if (match) {
+              contestIdStr = match[1];
+              indexStr = match[2];
             }
           }
-        } catch (e) {
-          // Ignore URL parsing errors, maybe it's a short ID
-        }
 
-        // Fallback to short ID parsing
-        if (!contestIdStr || !indexStr) {
-          const match = trimmed.match(/^(\d+)([A-Za-z]\d*)$/);
-          if (match) {
-            contestIdStr = match[1];
-            indexStr = match[2];
+          if (!contestIdStr || !indexStr) {
+             throw new Error(`Invalid problem format or link: ${p.id}. Use a Codeforces link or format like '2207G'.`);
           }
-        }
+          
+          const pts = typeof p.points === "string" ? parseInt(p.points) : p.points;
+          if (!pts || pts < 1 || pts > 100) throw new Error(`Points must be between 1 and 100.`);
 
-        if (!contestIdStr || !indexStr) {
-           throw new Error(`Invalid problem format or link: ${p.id}. Use a Codeforces link or format like '2207G'.`);
-        }
-        
-        const pts = typeof p.points === "string" ? parseInt(p.points) : p.points;
-        if (!pts || pts < 1 || pts > 100) throw new Error(`Points must be between 1 and 100.`);
-
-        return {
-          contestId: parseInt(contestIdStr),
-          index: indexStr.toUpperCase(),
-          points: pts,
-        };
-      });
+          return {
+            contestId: parseInt(contestIdStr),
+            index: indexStr.toUpperCase(),
+            points: pts,
+          };
+        });
+      }
 
       const parsedDuration = typeof duration === "string" ? parseInt(duration) : duration;
       if (!parsedDuration || parsedDuration < 1 || parsedDuration > 120) {
@@ -75,7 +101,7 @@ export default function CreateContest() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          problems: parsedProblems,
+          problems: finalProblems,
           durationMinutes: parsedDuration,
         }),
       });
@@ -131,48 +157,107 @@ export default function CreateContest() {
                 <span className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm">1</span>
                 Problems
               </h2>
-              <button onClick={addProblem} className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-1.5 rounded-full transition-colors">
-                + Add Problem
+            </div>
+            
+            <div className="flex bg-black/40 p-1 rounded-xl mb-6 w-full max-w-sm">
+              <button
+                onClick={() => setMode("manual")}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  mode === "manual" ? "bg-indigo-600 text-white shadow-md" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Manual
+              </button>
+              <button
+                onClick={() => setMode("random")}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  mode === "random" ? "bg-indigo-600 text-white shadow-md" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Random
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex gap-3 items-center px-1 mb-1">
-                <div className="w-8"></div>
-                <div className="flex-1 text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Problem Link or ID</div>
-                <div className="w-32 text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Points</div>
-                <div className="w-10"></div>
-              </div>
-              {problems.map((p, i) => (
-                <div key={i} className="flex gap-3 items-center group">
-                  <div className="w-8 text-center text-neutral-500 font-mono text-sm">{i + 1}</div>
-                  <input
-                    type="text"
-                    placeholder="CF problem link or ID (e.g. 2207G)"
-                    value={p.id}
-                    onChange={(e) => updateProblem(i, "id", e.target.value)}
-                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono min-w-0"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Points (1-100)"
-                    value={p.points}
-                    onChange={(e) => updateProblem(i, "points", e.target.value === "" ? "" : parseInt(e.target.value))}
-                    min={1}
-                    max={100}
-                    title="Enter points between 1 and 100"
-                    className="w-32 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors"
-                  />
-                  <button 
-                    onClick={() => removeProblem(i)}
-                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 opacity-50 group-hover:opacity-100 transition-all disabled:opacity-20"
-                    disabled={problems.length <= 1}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            {mode === "manual" ? (
+              <div className="space-y-3">
+                <div className="flex justify-end mb-2">
+                  <button onClick={addProblem} className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-1.5 rounded-full transition-colors">
+                    + Add Problem
                   </button>
                 </div>
-              ))}
-            </div>
+                <div className="flex gap-3 items-center px-1 mb-1">
+                  <div className="w-8"></div>
+                  <div className="flex-1 text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Problem Link or ID</div>
+                  <div className="w-32 text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Points</div>
+                  <div className="w-10"></div>
+                </div>
+                {problems.map((p, i) => (
+                  <div key={i} className="flex gap-3 items-center group">
+                    <div className="w-8 text-center text-neutral-500 font-mono text-sm">{i + 1}</div>
+                    <input
+                      type="text"
+                      placeholder="CF problem link or ID (e.g. 2207G)"
+                      value={p.id}
+                      onChange={(e) => updateProblem(i, "id", e.target.value)}
+                      className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono min-w-0"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Points (1-100)"
+                      value={p.points}
+                      onChange={(e) => updateProblem(i, "points", e.target.value === "" ? "" : parseInt(e.target.value))}
+                      min={1}
+                      max={100}
+                      title="Enter points between 1 and 100"
+                      className="w-32 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                    <button 
+                      onClick={() => removeProblem(i)}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 opacity-50 group-hover:opacity-100 transition-all disabled:opacity-20"
+                      disabled={problems.length <= 1}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col">
+                    <label className="text-neutral-400 font-medium mb-1">Min Rating</label>
+                    <input
+                      type="number"
+                      value={minRating}
+                      onChange={(e) => setMinRating(e.target.value === "" ? "" : parseInt(e.target.value))}
+                      step={100}
+                      className="bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-neutral-400 font-medium mb-1">Max Rating</label>
+                    <input
+                      type="number"
+                      value={maxRating}
+                      onChange={(e) => setMaxRating(e.target.value === "" ? "" : parseInt(e.target.value))}
+                      step={100}
+                      className="bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col max-w-xs">
+                  <label className="text-neutral-400 font-medium mb-1">Number of Problems</label>
+                  <input
+                    type="number"
+                    value={problemCount}
+                    onChange={(e) => setProblemCount(e.target.value === "" ? "" : parseInt(e.target.value))}
+                    min={1}
+                    max={20}
+                    className="bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="h-px w-full bg-white/10" />
