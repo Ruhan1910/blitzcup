@@ -68,12 +68,27 @@ export default function RoomPage() {
       try {
         const res = await fetch(`/api/cf?handle=${myHandle}&count=100`);
         const data = await res.json();
+        
         if (data.status === "OK") {
-          const solved = data.result.find((s: any) => 
-            s.verdict === "OK" && 
-            s.problem.contestId === currentProblem.contestId && 
-            s.problem.index === currentProblem.index
-          );
+          // Compare strings to avoid 123 === "123" failing
+          // ALSO check that the solve happened AFTER the duel started
+          // so old solves don't instantly win the duel!
+          const solved = data.result.find((s: any) => {
+            if (s.verdict !== "OK") return false;
+            
+            const isTargetProblem = String(s.problem.contestId) === String(currentProblem.contestId) && 
+                                    String(s.problem.index) === String(currentProblem.index);
+            
+            if (!isTargetProblem) return false;
+
+            // Ensure the submission happened after the room started running
+            if (room.startTime) {
+               // CF time is in seconds, room startTime is in ms
+               const roomStartSeconds = Math.floor(room.startTime / 1000);
+               return s.creationTimeSeconds >= roomStartSeconds;
+            }
+            return false;
+          });
 
           if (solved) {
             // WE SOLVED IT!
@@ -108,7 +123,7 @@ export default function RoomPage() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [room?.status, room?.currentProblemIndex, mySlot, room, roomId]);
+  }, [room?.status, room?.currentProblemIndex, mySlot, room?.problems, roomId]);
 
 
   // Auto-start room if both joined
