@@ -17,7 +17,8 @@ export default function RoomPage() {
   // Local state
   const [handleInput, setHandleInput] = useState("");
   const [mySlot, setMySlot] = useState<"player1" | "player2" | null>(null);
-  
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
   // Ref to prevent double-checking the same problem
   const lastCheckedIndex = useRef(-1);
   const previousProblemIndex = useRef(0);
@@ -82,7 +83,7 @@ export default function RoomPage() {
         audio.play().catch(e => console.log("Audio play blocked by browser:", e));
       } catch (e) {}
 
-      // Trigger Browser Notification
+      // Trigger Browser Notification (Fallback)
       try {
         if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
           new Notification("Next Problem Unlocked!", {
@@ -93,6 +94,10 @@ export default function RoomPage() {
       } catch (e) {
         console.log("Notification trigger failed", e);
       }
+      
+      // Trigger In-App Popup
+      setAlertMessage(`🔥 Problem ${nameOfProblem} was solved! Next problem unlocked.`);
+      setTimeout(() => setAlertMessage(null), 6000);
 
       previousProblemIndex.current = room.currentProblemIndex;
     }
@@ -364,6 +369,16 @@ export default function RoomPage() {
         </div>
       </header>
 
+      {/* Toast Alert */}
+      {alertMessage && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-10 fade-in duration-300">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(79,70,229,0.8)] border border-white/20 flex items-center gap-3">
+            <span className="text-2xl">⚡</span>
+            <p className="font-bold text-lg">{alertMessage}</p>
+          </div>
+        </div>
+      )}
+
       {/* Main Arena */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 z-10 w-full max-w-5xl mx-auto">
         
@@ -394,8 +409,10 @@ export default function RoomPage() {
             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
             
             <div className="relative z-10 flex flex-col items-center text-center">
-              <div className="px-5 py-2 rounded-full bg-white/10 border border-white/10 text-sm font-bold tracking-widest text-indigo-300 uppercase mb-8">
-                Active Problem
+              <div className="px-5 py-2 rounded-full bg-white/10 border border-white/10 text-sm font-bold tracking-widest text-indigo-300 uppercase mb-8 flex items-center gap-2">
+                <span>Active</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-white/30 mx-1" />
+                <span>Problem {Math.min(room.currentProblemIndex + 1, room.problems.length)} / {room.problems.length}</span>
               </div>
               
               <h2 className="text-7xl md:text-9xl font-black mb-6 tracking-tighter saturate-150">
