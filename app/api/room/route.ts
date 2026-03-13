@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { roomsStore, Room, Problem } from "@/lib/store";
+import { setRoom, Room } from "@/lib/store";
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       winner: null,
     };
 
-    roomsStore.set(roomId, newRoom);
+    await setRoom(roomId, newRoom);
 
     return NextResponse.json({ roomId: newRoom.id });
   } catch (err: any) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { roomsStore, Room } from "@/lib/store";
+import { getRoom, setRoom, Room } from "@/lib/store";
 
 export async function GET(
   request: Request,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   const { roomId } = await params;
   const normalizedId = roomId.toUpperCase();
-  const room = roomsStore.get(normalizedId);
+  const room = await getRoom(normalizedId);
 
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
@@ -19,6 +19,7 @@ export async function GET(
     if (elapsedSeconds >= room.durationMinutes * 60) {
       room.status = "finished";
       room.winner = getWinner(room);
+      await setRoom(normalizedId, room);
     }
   }
 
@@ -31,7 +32,7 @@ export async function POST(
 ) {
   const { roomId } = await params;
   const normalizedId = roomId.toUpperCase();
-  const room = roomsStore.get(normalizedId);
+  const room = await getRoom(normalizedId);
 
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
@@ -41,9 +42,10 @@ export async function POST(
     const updates: Partial<Room> = await request.json();
     
     // Merge updates
-    Object.assign(room, updates);
+    const updatedRoom = { ...room, ...updates };
+    await setRoom(normalizedId, updatedRoom);
 
-    return NextResponse.json({ room });
+    return NextResponse.json({ room: updatedRoom });
   } catch (err) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
