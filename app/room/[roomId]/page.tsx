@@ -115,12 +115,16 @@ export default function RoomPage() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(updates),
             });
+            
+            // Instantly update local UI
+            setRoom((prev) => prev ? { ...prev, ...updates } as Room : null);
+
           }
         }
       } catch (err) {
         console.error("API error", err);
       }
-    }, 4000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [room?.status, room?.currentProblemIndex, mySlot, room?.problems, roomId]);
