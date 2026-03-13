@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 export default function CreateContest() {
   const router = useRouter();
 
-  const [problems, setProblems] = useState<{ id: string; points: number }[]>([
+  const [problems, setProblems] = useState<{ id: string; points: number | string }[]>([
     { id: "4A", points: 10 },
     { id: "71A", points: 20 },
     { id: "158A", points: 30 },
   ]);
-  const [duration, setDuration] = useState(20);
+  const [duration, setDuration] = useState<number | string>(20);
   const [loading, setLoading] = useState(false);
 
   async function handleCreate() {
@@ -21,19 +21,28 @@ export default function CreateContest() {
       const parsedProblems = problems.map((p) => {
         const match = p.id.trim().match(/^(\d+)([A-Za-z]\d*)$/);
         if (!match) throw new Error(`Invalid problem format: ${p.id}. Use format like '2207G'.`);
+        
+        const pts = typeof p.points === "string" ? parseInt(p.points) : p.points;
+        if (!pts || pts < 1 || pts > 100) throw new Error(`Points must be between 1 and 100.`);
+
         return {
           contestId: parseInt(match[1]),
           index: match[2].toUpperCase(),
-          points: p.points,
+          points: pts,
         };
       });
+
+      const parsedDuration = typeof duration === "string" ? parseInt(duration) : duration;
+      if (!parsedDuration || parsedDuration < 1 || parsedDuration > 120) {
+        throw new Error("Duration must be between 1 and 120 minutes.");
+      }
 
       const res = await fetch("/api/room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           problems: parsedProblems,
-          durationMinutes: duration,
+          durationMinutes: parsedDuration,
         }),
       });
 
@@ -106,10 +115,13 @@ export default function CreateContest() {
                   />
                   <input
                     type="number"
-                    placeholder="Points"
+                    placeholder="Points (1-100)"
                     value={p.points}
-                    onChange={(e) => updateProblem(i, "points", parseInt(e.target.value) || 0)}
-                    className="w-24 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                    onChange={(e) => updateProblem(i, "points", e.target.value === "" ? "" : parseInt(e.target.value))}
+                    min={1}
+                    max={100}
+                    title="Enter points between 1 and 100"
+                    className="w-32 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                   <button 
                     onClick={() => removeProblem(i)}
@@ -131,12 +143,18 @@ export default function CreateContest() {
               Settings
             </h2>
             <div className="flex items-center gap-4">
-              <label className="text-neutral-400 font-medium">Duration (minutes)</label>
+              <div className="flex flex-col">
+                <label className="text-neutral-400 font-medium">Duration (minutes)</label>
+                <span className="text-xs text-neutral-600">Enter a value between 1-120</span>
+              </div>
               <input
                 type="number"
                 value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value) || 20)}
-                className="w-24 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                onChange={(e) => setDuration(e.target.value === "" ? "" : parseInt(e.target.value))}
+                min={1}
+                max={120}
+                placeholder="1-120"
+                className="w-28 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
               />
             </div>
           </div>
